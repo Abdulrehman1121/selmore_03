@@ -1,25 +1,69 @@
 import { Router } from "express";
 import { authGuard, roleGuard } from "../middleware/auth";
 import multer from "multer";
-import path from "path";
-import { createBillboard, listBillboards, getBillboard, updateBillboard, deleteBillboard } from '../controllers/billboardController';
+import os from "os";
+import {
+  listBillboards,
+  getBillboard,
+  createBillboard,
+  updateBillboard,
+  deleteBillboard,
+} from "../controllers/billboardController";
 
-const UPLOAD_DIR = process.env.UPLOAD_DIR || "uploads";
+const router = Router();
+
+// Configure multer for Vercel (Serverless)
+// Vercel only allows writing to /tmp directory
 const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, path.join(__dirname, "..", "..", UPLOAD_DIR));
+  destination: (req, file, cb) => {
+    cb(null, os.tmpdir());
   },
-  filename: function (req, file, cb) {
+  filename: (req, file, cb) => {
     cb(null, Date.now() + "-" + file.originalname);
-  }
+  },
 });
 const upload = multer({ storage });
 
-const router = Router();
-router.get("/", listBillboards); // public
+/**
+ * ✅ Get all billboards (public)
+ */
+router.get("/", listBillboards);
+
+/**
+ * ✅ Get a single billboard by ID
+ */
 router.get("/:id", getBillboard);
-router.post("/", authGuard, roleGuard(["owner"]), upload.single("image"), createBillboard);
-router.put("/:id", authGuard, roleGuard(["owner"]), upload.single("image"), updateBillboard);
-router.delete("/:id", authGuard, roleGuard(["owner"]), deleteBillboard);
+
+/**
+ * ✅ Create a new billboard (Owner only)
+ */
+router.post(
+  "/",
+  authGuard,
+  roleGuard(["owner"]),
+  upload.single("image"),
+  createBillboard
+);
+
+/**
+ * ✅ Update billboard (Owner only)
+ */
+router.put(
+  "/:id",
+  authGuard,
+  roleGuard(["owner"]),
+  upload.single("image"),
+  updateBillboard
+);
+
+/**
+ * ✅ Delete billboard (Owner only)
+ */
+router.delete(
+  "/:id",
+  authGuard,
+  roleGuard(["owner"]),
+  deleteBillboard
+);
 
 export default router;

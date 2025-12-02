@@ -21,7 +21,7 @@ async function main() {
 
   await prisma.billboard.createMany({
     data: [
-      { ownerId: owner.id, title: "Times Square", location: "New York, NY", type: "Digital", price: 800, priceType: "day", bookingType: "direct" },
+      { ownerId: owner.id, title: "Times Square", location: "New York, NY", city: "New York", type: "Digital", price: 800, priceType: "day", bookingType: "direct" },
       // add more...
     ]
   });

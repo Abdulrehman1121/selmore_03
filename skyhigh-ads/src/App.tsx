@@ -14,7 +14,8 @@ import Contact from "./pages/Contact";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/login";
 import Signup from "./pages/signup";
-
+import OwnerDashboard from "./pages/OwnerDashboard";
+import ClientDashboard from "./pages/ClientDashboard";
 
 const queryClient = new QueryClient();
 
@@ -35,6 +36,8 @@ const App = () => (
           <Route path="/contact" element={<Contact />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
+          <Route path="/dashboard/owner" element={<OwnerDashboard />} />
+          <Route path="/dashboard/advertiser" element={<ClientDashboard />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

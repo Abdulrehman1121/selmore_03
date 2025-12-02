@@ -5,40 +5,47 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { API_BASE_URL } from "@/lib/api";
 
 const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const navigate = useNavigate();
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // ✅ Simulated login check (replace later with API)
-    const userData = localStorage.getItem("users");
-    if (!userData) {
-      toast.error("No user found. Please register first!");
-      return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        toast.error(data.error || "Invalid credentials!");
+        return;
+      }
+
+      // ✅ Save token & user
+      localStorage.setItem("token", data.token);
+      localStorage.setItem("currentUser", JSON.stringify(data.user));
+
+      toast.success(`Welcome ${data.user.role}! Redirecting...`);
+
+      if (data.user.role === "owner") {
+        navigate("/dashboard/owner");
+      } else {
+        navigate("/dashboard/advertiser");
+      }
+    } catch (err) {
+      toast.error("Something went wrong!");
+      console.log(err);
     }
-
-    const users = JSON.parse(userData);
-    const user = users.find(
-      (u: any) => u.email === email && u.password === password
-    );
-
-    if (!user) {
-      toast.error("Invalid credentials!");
-      return;
-    }
-
-    // ✅ Store session
-    localStorage.setItem("currentUser", JSON.stringify(user));
-
-    toast.success(`Welcome ${user.role}! Redirecting...`);
-
-    // Redirect based on role
-    if (user.role === "owner") navigate("/dashboard/owner");
-    else if (user.role === "client") navigate("/dashboard/client");
   };
 
   return (
@@ -46,6 +53,7 @@ const Login = () => {
       <Card className="w-full max-w-md shadow-md">
         <CardContent className="p-6 space-y-4">
           <h2 className="text-2xl font-bold text-center">Login</h2>
+
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
               <Label>Email</Label>
@@ -57,6 +65,7 @@ const Login = () => {
                 required
               />
             </div>
+
             <div>
               <Label>Password</Label>
               <Input
@@ -67,13 +76,14 @@ const Login = () => {
                 required
               />
             </div>
+
             <Button type="submit" className="w-full">
               Login
             </Button>
           </form>
 
           <p className="text-sm text-center text-muted-foreground">
-            Don’t have an account?{" "}
+            Don&apos;t have an account?{" "}
             <span
               onClick={() => navigate("/signup")}
               className="text-primary cursor-pointer hover:underline"

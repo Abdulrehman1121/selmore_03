@@ -1,10 +1,11 @@
-generator client {
+generator client { 
   provider = "prisma-client-js"
 }
 
-datasource db {
-  provider = "postgresql"
+datasource db { 
+  provider = "postgresql" 
   url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_DATABASE_URL")
 }
 
 model User {
@@ -12,7 +13,11 @@ model User {
   name             String
   email            String      @unique
   password         String
-  role             String?
+  role             String      @default("client") // "owner" | "client" | "admin"
+  profileImage     String?
+  totalRevenue     Float       @default(0)
+  totalSpend       Float       @default(0)
+  totalImpressions Int         @default(0)
   billboards       Billboard[]
   campaigns        Campaign[]
   bids             Bid[]
@@ -20,85 +25,149 @@ model User {
   receivedMessages Message[]   @relation("ReceivedMessages")
   ownerBookings    Booking[]   @relation("OwnerBookings")
   clientBookings   Booking[]   @relation("ClientBookings")
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  @@index([email])
+  @@index([role])
 }
 
 model Billboard {
-  id          Int       @id @default(autoincrement())
-  title       String
-  location    String
-  city        String
-  price       Float
-  priceType   String?
-  bookingType String?
-  image       String?
-  ownerId     Int
-  owner       User      @relation(fields: [ownerId], references: [id])
-  bids        Bid[]
-  type        String
-  bookings    Booking[]
-  createdAt   DateTime  @default(now())
+  id             Int        @id @default(autoincrement())
+  title          String
+  location       String
+  city           String
+  price          Float
+  priceType      String     @default("daily") // "daily" | "weekly" | "monthly"
+  bookingType    String     @default("direct") // "direct" | "bidding"
+  image          String?
+  type           String
+  size           String?    // Billboard size/dimensions
+  weekPrice      Float?     // Weekly price
+  monthPrice     Float?     // Monthly price
+  impressions    Int        @default(0)
+  status         String     @default("available") // "available" | "booked"
+  ownerId        Int
+  owner          User       @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  bids           Bid[]
+  bookings       Booking[]
+  analytics      BillboardAnalytics[]
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  @@index([city])
+  @@index([type])
+  @@index([status])
+  @@index([ownerId])
+}
+
+model BillboardAnalytics {
+  id           Int       @id @default(autoincrement())
+  billboardId  Int
+  impressions  Int       @default(0)
+  clicks       Int       @default(0)
+  ctr          Float     @default(0)
+  date         DateTime  @default(now())
+  billboard    Billboard @relation(fields: [billboardId], references: [id], onDelete: Cascade)
+
+  @@index([billboardId])
+  @@index([date])
 }
 
 model Campaign {
   id          Int       @id @default(autoincrement())
-  name        String
+  name        String    @default("")
+  title       String?   // Campaign title
   description String?
   clientId    Int
-  client      User      @relation(fields: [clientId], references: [id])
+  client      User      @relation(fields: [clientId], references: [id], onDelete: Cascade)
   bids        Bid[]
   bookings    Booking[]
+  mediaFiles  String[]  @default([])
+  budget      Float     @default(0)
+  impressions Int       @default(0)
+  status      String    @default("active") // "active" | "completed" | "paused"
+  startDate   DateTime? // Campaign start date
+  endDate     DateTime? // Campaign end date
   createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([clientId])
+  @@index([status])
 }
-
-
 
 model Booking {
   id          Int       @id @default(autoincrement())  
   ownerId     Int
   clientId    Int
   billboardId Int
-  campaignId  Int
-  startDate   DateTime
-  endDate     DateTime
-  status      String
+  campaignId  Int?      // Made optional as some bookings might not have campaign
+  startDate   DateTime  @default(now())
+  endDate     DateTime  @default(now())
+  status      String    @default("confirmed") // "pending" | "confirmed" | "completed" | "cancelled"
   price       Float
-  owner       User      @relation("OwnerBookings", fields: [ownerId], references: [id])
-  client      User      @relation("ClientBookings", fields: [clientId], references: [id])
-  billboard   Billboard @relation(fields: [billboardId], references: [id])
-  campaign    Campaign  @relation(fields: [campaignId], references: [id])
+  owner       User      @relation("OwnerBookings", fields: [ownerId], references: [id], onDelete: Cascade)
+  client      User      @relation("ClientBookings", fields: [clientId], references: [id], onDelete: Cascade)
+  billboard   Billboard @relation(fields: [billboardId], references: [id], onDelete: Cascade)
+  campaign    Campaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
   invoice     Invoice?
   createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([ownerId])
+  @@index([clientId])
+  @@index([billboardId])
+  @@index([campaignId])
+  @@index([status])
 }
 
 model Invoice {
   id            Int      @id @default(autoincrement())
-  invoiceNumber String
+  invoiceNumber String   @unique
   amount        Float
-  status        String
+  status        String   @default("unpaid") // "unpaid" | "paid" | "cancelled"
   bookingId     Int      @unique
-  booking       Booking  @relation(fields: [bookingId], references: [id])
+  booking       Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
   createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([invoiceNumber])
+  @@index([status])
 }
 
 model Message {
   id        Int      @id @default(autoincrement())
   fromId    Int
   toId      Int
-  content   String
+  subject   String   @default("") // Message subject
+  body      String?  // Message body
+  content   String   @default("") // Message content
+  read      Boolean  @default(false) // Read status
   createdAt DateTime @default(now())
-  from      User     @relation("SentMessages", fields: [fromId], references: [id])
-  to        User     @relation("ReceivedMessages", fields: [toId], references: [id])
+  from      User     @relation("SentMessages", fields: [fromId], references: [id], onDelete: Cascade)
+  to        User     @relation("ReceivedMessages", fields: [toId], references: [id], onDelete: Cascade)
+
+  @@index([fromId])
+  @@index([toId])
+  @@index([read])
 }
+
 model Bid {
   id          Int       @id @default(autoincrement())
   campaignId  Int
   billboardId Int
-  amount      Float
-  status      String    @default("pending")
-  campaign    Campaign  @relation(fields: [campaignId], references: [id])
-  billboard   Billboard @relation(fields: [billboardId], references: [id])
-  userId      Int?
+  amount      Float     @default(0)
   clientBid   Float
-  createdAt   DateTime @default(now())
-  user        User?     @relation(fields: [userId], references: [id])
+  status      String    @default("pending") // "pending" | "accepted" | "rejected"
+  userId      Int?
+  campaign    Campaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  billboard   Billboard @relation(fields: [billboardId], references: [id], onDelete: Cascade)
+  user        User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([campaignId])
+  @@index([billboardId])
+  @@index([userId])
+  @@index([status])
 }

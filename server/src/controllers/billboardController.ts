@@ -17,10 +17,13 @@ export const listBillboards = async (req: Request, res: Response) => {
   res.json(billboards);
 };
 
-export const getBillboard = async (req: Request, res: Response) => {
-  const id = req.params.id;
+export const getBillboard = async (req: Request, res: Response): Promise<void> => {
+  const id = parseInt(req.params.id);
   const b = await prisma.billboard.findUnique({ where: { id } });
-  if (!b) return res.status(404).json({ error: "Not found" });
+  if (!b) {
+    res.status(404).json({ error: "Not found" });
+    return;
+  }
   res.json(b);
 };
 
@@ -36,12 +39,10 @@ export const createBillboard = async (req: any, res: Response) => {
         location: data.location,
         city: data.city,
         type: data.type,
-        size: data.size,
-        impressions: data.impressions,
         price: parseFloat(data.price),
         priceType: data.priceType,
-        weekPrice: data.weekPrice ? parseFloat(data.weekPrice) : null,
-        monthPrice: data.monthPrice ? parseFloat(data.monthPrice) : null,
+        weekPrice: data.weekPrice ? parseFloat(data.weekPrice) : undefined,
+        monthPrice: data.monthPrice ? parseFloat(data.monthPrice) : undefined,
         bookingType: data.bookingType || "direct",
         image
       }
@@ -52,12 +53,18 @@ export const createBillboard = async (req: any, res: Response) => {
   }
 };
 
-export const updateBillboard = async (req: any, res: Response) => {
+export const updateBillboard = async (req: any, res: Response): Promise<void> => {
   try {
-    const { id } = req.params;
+    const id = parseInt(req.params.id);
     const bb = await prisma.billboard.findUnique({ where: { id } });
-    if (!bb) return res.status(404).json({ error: "Not found" });
-    if (bb.ownerId !== req.user.id) return res.status(403).json({ error: "Forbidden" });
+    if (!bb) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
+    if (bb.ownerId !== req.user.id) {
+      res.status(403).json({ error: "Forbidden" });
+      return;
+    }
 
     const data = req.body;
     const image = req.file ? `/${process.env.UPLOAD_DIR || "uploads"}/${req.file.filename}` : bb.image;
@@ -72,12 +79,18 @@ export const updateBillboard = async (req: any, res: Response) => {
   }
 };
 
-export const deleteBillboard = async (req: any, res: Response) => {
+export const deleteBillboard = async (req: any, res: Response): Promise<void> => {
   try {
-    const { id } = req.params;
+    const id = parseInt(req.params.id);
     const bb = await prisma.billboard.findUnique({ where: { id } });
-    if (!bb) return res.status(404).json({ error: "Not found" });
-    if (bb.ownerId !== req.user.id) return res.status(403).json({ error: "Forbidden" });
+    if (!bb) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
+    if (bb.ownerId !== req.user.id) {
+      res.status(403).json({ error: "Forbidden" });
+      return;
+    }
 
     if (bb.image) {
       const fpath = path.join(__dirname, "..", "..", bb.image);

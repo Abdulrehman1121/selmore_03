@@ -2,74 +2,54 @@ import { Request, Response } from "express";
 import prisma from "../prismaClient";
 import PDFDocument from "pdfkit";
 
-interface AuthUser {
-  id: string;
-  role: "owner" | "client" | string;
-}
-
-interface AuthRequest<TParams = any, TBody = any, TQuery = any> extends Request<TParams, any, TBody, TQuery> {
-  user: AuthUser;
-}
-
-interface BookingId {
-  id: string;
-}
-
-interface Booking {
-  id: string;
-  ownerId: string;
-  clientId: string;
-}
-
-interface Invoice {
-  id: string;
-  invoiceNumber: string;
-  amount: number;
-  status: string;
-  createdAt: string | Date;
-  bookingId?: string;
-}
-
-interface InvoiceWithBooking extends Invoice {
-  booking: Booking;
-}
-
-export const listInvoices = async (req: AuthRequest, res: Response) => {
+export const listInvoices = async (req: any, res: Response): Promise<void> => {
   if (req.user.role === "owner") {
-    const bookings = (await prisma.booking.findMany({
+    const bookings = await prisma.booking.findMany({
       where: { ownerId: req.user.id },
       select: { id: true },
-    })) as BookingId[];
-    const bookingIds = bookings.map((b: BookingId) => b.id);
+    });
+    const bookingIds = bookings.map((b) => b.id);
     const invoices = await prisma.invoice.findMany({ where: { bookingId: { in: bookingIds } } });
-    return res.json(invoices);
+    res.json(invoices);
+    return;
   }
 
   if (req.user.role === "client") {
-    const bookings = (await prisma.booking.findMany({
+    const bookings = await prisma.booking.findMany({
       where: { clientId: req.user.id },
       select: { id: true },
-    })) as BookingId[];
-    const bookingIds = bookings.map((b: BookingId) => b.id);
+    });
+    const bookingIds = bookings.map((b) => b.id);
     const invoices = await prisma.invoice.findMany({ where: { bookingId: { in: bookingIds } } });
-    return res.json(invoices);
+    res.json(invoices);
+    return;
   }
 
   const invoices = await prisma.invoice.findMany();
   res.json(invoices);
 };
 
-export const downloadInvoice = async (req: AuthRequest<{ id: string }>, res: Response) => {
-  const { id } = req.params;
-  const invoice = (await prisma.invoice.findUnique({
+export const downloadInvoice = async (req: any, res: Response): Promise<void> => {
+  const id = parseInt(req.params.id);
+  const invoice = await prisma.invoice.findUnique({
     where: { id },
     include: { booking: true },
-  })) as InvoiceWithBooking | null;
-  if (!invoice) return res.status(404).json({ error: "Not found" });
+  });
+
+  if (!invoice) {
+    res.status(404).json({ error: "Not found" });
+    return;
+  }
 
   const booking = invoice.booking;
-  if (req.user.role === "owner" && booking.ownerId !== req.user.id) return res.status(403).json({ error: "Forbidden" });
-  if (req.user.role === "client" && booking.clientId !== req.user.id) return res.status(403).json({ error: "Forbidden" });
+  if (req.user.role === "owner" && booking.ownerId !== req.user.id) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+  if (req.user.role === "client" && booking.clientId !== req.user.id) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
 
   const doc = new PDFDocument();
   res.setHeader("Content-Type", "application/pdf");
@@ -84,8 +64,8 @@ export const downloadInvoice = async (req: AuthRequest<{ id: string }>, res: Res
   doc.end();
 };
 
-export const markPaid = async (req: AuthRequest<{ id: string }>, res: Response) => {
-  const { id } = req.params;
-  const inv = (await prisma.invoice.update({ where: { id }, data: { status: "paid" } })) as Invoice;
+export const markPaid = async (req: any, res: Response) => {
+  const id = parseInt(req.params.id);
+  const inv = await prisma.invoice.update({ where: { id }, data: { status: "paid" } });
   res.json(inv);
 };
